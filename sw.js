@@ -1,13 +1,13 @@
 // Service worker : permet d'ouvrir l'application sans réseau (cave, sous-sol...)
 // À chaque mise à jour de index.html, augmenter VERSION pour forcer le rafraîchissement.
-const VERSION = 'clim-v2';
+const VERSION = 'clim-v3';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
-const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const LIBS = ['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(VERSION)
-      .then(c => c.addAll(CORE).then(() => c.add(JSPDF).catch(() => {})))
+      .then(c => c.addAll(CORE).then(() => Promise.all(LIBS.map(u => c.add(u).catch(() => {})))))
       .then(() => self.skipWaiting())
   );
 });

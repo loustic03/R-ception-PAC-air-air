@@ -164,12 +164,55 @@ input.mono{font-family:'IBM Plex Mono',monospace;letter-spacing:.3px}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
 .lightbox.show{display:flex}
 .lightbox img{max-width:100%;max-height:100%;border-radius:6px}
+
+/* ── Scan code-barres ── */
+[hidden]{display:none!important}
+.sn-wrap{display:flex;gap:6px}
+.sn-wrap input{flex:1;min-width:0}
+.scan-btn{flex-shrink:0;width:44px;height:42px;border-radius:var(--r);border:1px solid rgba(47,129,247,.45);background:var(--ac-l);color:var(--ac);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.scan-btn:active{background:var(--ac);color:#fff}
+.scanner{position:fixed;inset:0;background:#000;z-index:1100;display:none;flex-direction:column;max-width:480px;margin:0 auto}
+.scanner.show{display:flex}
+.scan-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--surf);border-bottom:1px solid var(--bdr);font-family:'Syne',sans-serif;font-weight:600;font-size:14px}
+.scan-x{width:36px;height:36px;border-radius:8px;border:1px solid var(--bdr2);background:var(--surf2);color:var(--tx);font-size:16px;cursor:pointer}
+#scan-live{flex:1;display:flex;flex-direction:column;overflow:auto}
+.scan-view{position:relative;width:100%;background:#000}
+#scan-video{width:100%;display:block}
+.scan-frame{position:absolute;left:5%;right:5%;top:25%;bottom:25%;border:2px solid var(--ac);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45)}
+.scan-view{overflow:hidden}
+.scan-msg{color:var(--tx2);font-size:13px;text-align:center;padding:14px 16px;line-height:1.5}
+.scan-tools{display:flex;gap:8px;padding:0 14px 16px}
+.scan-tools .btn.on{background:var(--or);color:#000;border-color:var(--or)}
+#scan-result{padding:16px 14px;background:var(--bg);flex:1;overflow:auto}
+.scan-parts{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.scan-part{border:1px solid var(--bdr2);background:var(--surf2);color:var(--tx);border-radius:6px;padding:6px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;cursor:pointer}
+.scan-part:active{border-color:var(--ac);color:var(--ac)}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 <div class="lightbox" id="lightbox"><img id="lightbox-img" alt=""></div>
+<div class="scanner" id="scanner">
+  <div class="scan-hd"><span id="scan-title">Scanner</span><button class="scan-x" id="scan-close" aria-label="Fermer">✕</button></div>
+  <div id="scan-live">
+    <div class="scan-view"><video id="scan-video" playsinline muted autoplay></video><div class="scan-frame"></div></div>
+    <div class="scan-msg" id="scan-msg"></div>
+    <div class="scan-tools">
+      <button class="btn btn-s" id="scan-torch" hidden>🔦 Lampe</button>
+    </div>
+  </div>
+  <div id="scan-result" hidden>
+    <label for="scan-val">Code lu — vérifiez avant de valider</label>
+    <input id="scan-val" class="mono" type="text" autocapitalize="characters">
+    <div id="scan-parts-wrap" hidden>
+      <div class="scan-msg" style="text-align:left;padding:10px 0 0">Ce code contient plusieurs informations, touchez la bonne :</div>
+      <div class="scan-parts" id="scan-parts"></div>
+    </div>
+    <button class="btn btn-p" id="scan-ok" style="margin-top:14px">Utiliser ce numéro</button>
+    <button class="btn btn-s" id="scan-again" style="margin-top:8px">↻ Scanner à nouveau</button>
+  </div>
+</div>
 <script>
 // ═══════════════════════════════════════════════════════════════════════
 // RÉCEPTION CHANTIER CLIMATISATION — v2
@@ -403,6 +446,149 @@ function renderChantier(){
   <div class="botnav">${nav}</div>`;
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// SCAN DES CODES-BARRES (numéros de série, modèles)
+// Bibliothèque chargée uniquement au premier scan, puis gardée hors ligne
+// ══════════════════════════════════════════════════════════════════════
+const ZXING_LIB='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+const SCAN_ICON='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>';
+// Champ scannable → [tableau du chantier, clé]
+const SCAN_FIELDS={
+  'ue-modele':['ue','modele'], 'ue-sn':['ue','sn_ue'],
+  'ui-modele':['units','modele'], 'ui-sn':['units','sn_ui'], 'ui-sn-gain':['units','sn_gainable'],
+};
+function scanField(cls,val,ph,i,label){
+  return `<div class="sn-wrap">
+    <input class="${cls} mono" type="text" value="${esc(val)}" placeholder="${ph}" data-i="${i}" autocapitalize="characters">
+    <button class="scan-btn" data-scan="${cls}" data-i="${i}" data-lbl="${esc(label)}" aria-label="Scanner le code-barres">${SCAN_ICON}</button>
+  </div>`;
+}
+
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script'); s.src=src;
+    s.onload=()=>res(); s.onerror=()=>{s.remove();rej(new Error('chargement'));};
+    document.head.appendChild(s);
+  });
+}
+
+// Lecture à la pleine résolution de la caméra, dans la zone du cadre affiché.
+// Android (Chrome) : lecteur intégré du téléphone. iPhone : bibliothèque ZXing.
+const CAM={stream:null,track:null,timer:null,detector:null,reader:null,busy:false};
+const scanCanvas=document.createElement('canvas');
+const scanCtx=scanCanvas.getContext('2d',{willReadFrequently:true});
+const ZONE={w:0.9,h:0.5};   // zone lue = cadre affiché (90 % largeur, 50 % hauteur)
+let scanTarget=null;
+
+async function openScanner(cls,i,label){
+  scanTarget={cls,i};
+  el('scan-title').textContent='Scanner — '+label;
+  el('scan-result').hidden=true; el('scan-live').hidden=false;
+  el('scanner').classList.add('show');
+  startCam();
+}
+async function initEngine(){
+  if(CAM.detector||CAM.reader) return;
+  if('BarcodeDetector' in window){
+    try{
+      const want=['code_128','code_39','code_93','ean_13','ean_8','upc_a','upc_e','itf','codabar','qr_code','data_matrix'];
+      const fm=(await BarcodeDetector.getSupportedFormats()).filter(f=>want.includes(f));
+      if(fm.length){ CAM.detector=new BarcodeDetector({formats:fm}); return; }
+    }catch(e){}
+  }
+  if(!window.ZXing) await loadScript(ZXING_LIB);
+  const Z=window.ZXing, F=Z.BarcodeFormat;
+  const hints=new Map();
+  hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[F.CODE_128,F.CODE_39,F.CODE_93,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.ITF,F.CODABAR,F.QR_CODE,F.DATA_MATRIX]);
+  hints.set(Z.DecodeHintType.TRY_HARDER,true);
+  CAM.reader=new Z.MultiFormatReader(); CAM.reader.setHints(hints);
+}
+async function startCam(){
+  await stopCam();
+  const msg=el('scan-msg');
+  msg.textContent='Ouverture de la caméra…';
+  try{ await initEngine(); }
+  catch(e){ msg.textContent='Le lecteur n\'a pas pu être chargé. Une connexion internet est nécessaire la première fois.'; return; }
+  try{
+    CAM.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
+  }catch(e){
+    msg.textContent='Caméra inaccessible. Autorisez l\'accès à la caméra pour ce site dans les réglages du téléphone, puis réessayez.'; return;
+  }
+  const v=el('scan-video'); v.srcObject=CAM.stream;
+  try{ await v.play(); }catch(e){}
+  CAM.track=CAM.stream.getVideoTracks()[0];
+  try{ await CAM.track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){}
+  setupTorch();
+  msg.textContent='Placez le code-barres dans le cadre. Approchez jusqu\'à ce qu\'il remplisse la largeur.';
+  scanLoop();
+}
+async function scanLoop(){
+  if(!CAM.stream) return;
+  const v=el('scan-video');
+  let text=null;
+  try{
+    if(v.videoWidth){
+      const vw=v.videoWidth, vh=v.videoHeight;
+      const cw=Math.round(vw*ZONE.w), chh=Math.round(vh*ZONE.h);
+      scanCanvas.width=cw; scanCanvas.height=chh;
+      scanCtx.drawImage(v,(vw-cw)/2,(vh-chh)/2,cw,chh,0,0,cw,chh);
+      if(CAM.detector){
+        const r=await CAM.detector.detect(scanCanvas);
+        if(r.length) text=r[0].rawValue;
+      }else{
+        const Z=window.ZXing;
+        const bmp=new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(scanCanvas)));
+        try{ text=CAM.reader.decodeWithState(bmp).getText(); }catch(e){}
+        finally{ try{CAM.reader.reset();}catch(e){} }
+      }
+    }
+  }catch(e){}
+  if(!CAM.stream) return;
+  if(text){ onScanned(text); return; }
+  CAM.timer=setTimeout(scanLoop,CAM.detector?100:150);
+}
+async function stopCam(){
+  clearTimeout(CAM.timer); CAM.timer=null;
+  if(CAM.stream){ CAM.stream.getTracks().forEach(t=>t.stop()); }
+  CAM.stream=null; CAM.track=null;
+  const v=el('scan-video'); if(v) v.srcObject=null;
+  el('scan-torch').hidden=true;
+}
+function setupTorch(){
+  const b=el('scan-torch'); b.hidden=true; b.classList.remove('on');
+  try{
+    if(CAM.track?.getCapabilities?.().torch){
+      b.hidden=false; let on=false;
+      b.onclick=async()=>{ on=!on; try{await CAM.track.applyConstraints({advanced:[{torch:on}]});}catch(e){} b.classList.toggle('on',on); };
+    }
+  }catch(e){}
+}
+function onScanned(text){
+  stopCam();
+  try{ navigator.vibrate?.(80); }catch(e){}
+  const raw=String(text||'').trim();
+  // Un QR code peut contenir plusieurs infos (modèle, série...) : on propose de choisir
+  const parts=[...new Set(raw.split(/[\r\n;|,\t]+/).map(x=>x.trim()).filter(x=>x.length>=3))];
+  el('scan-val').value=(parts.length>1?parts[parts.length-1]:raw).toUpperCase();
+  el('scan-parts').innerHTML=parts.length>1?parts.map(p=>`<button class="scan-part">${esc(p)}</button>`).join(''):'';
+  el('scan-parts-wrap').hidden=parts.length<=1;
+  el('scan-parts').querySelectorAll('.scan-part').forEach(b=>b.onclick=()=>{el('scan-val').value=b.textContent.toUpperCase();});
+  el('scan-live').hidden=true; el('scan-result').hidden=false;
+}
+async function closeScanner(){
+  await stopCam();
+  el('scanner').classList.remove('show');
+}
+function applyScan(){
+  const v=el('scan-val').value.trim().toUpperCase();
+  const ch=cur(); if(!ch||!scanTarget) return closeScanner();
+  const [arr,key]=SCAN_FIELDS[scanTarget.cls];
+  const holder=ch[arr][scanTarget.i]; if(!holder) return closeScanner();
+  holder[key]=v; ch.updated=Date.now(); save();
+  closeScanner(); render();
+  if(v) toast('✓ '+v);
+}
+
 function renderMarqueField(marque_id, marque_custom, cls_sel, cls_custom, data_attr){
   const opts=MARQUES.map(m=>`<option value="${m.id}" ${marque_id===m.id?'selected':''}>${m.lbl}</option>`).join('');
   const showCustom=(marque_id==='autre'||(!marque_id&&marque_custom));
@@ -501,7 +687,7 @@ function s1(ch){
         <div class="field"><label>Marque</label>
           ${renderMarqueField(u.marque_id,u.marque_custom,'ue-marque-sel','ue-marque-custom',`data-i="${i}"`)}</div>
         <div class="field"><label>Modèle</label>
-          <input class="ue-modele mono" type="text" value="${esc(u.modele)}" placeholder="Ex : RXM35R" data-i="${i}"></div>
+          ${scanField('ue-modele',u.modele,'Ex : RXM35R',i,'Modèle UE')}</div>
       </div>
       <div class="row2">
         <div class="field"><label>Type / Gamme</label>
@@ -510,7 +696,7 @@ function s1(ch){
           <input class="ue-nb" type="number" inputmode="numeric" value="${esc(u.nb_ui)}" placeholder="Ex : 3" data-i="${i}" min="1"></div>
       </div>
       <div class="field"><label>N° de série UE</label>
-        <input class="ue-sn mono" type="text" value="${esc(u.sn_ue)}" placeholder="Numéro de série complet" data-i="${i}" autocapitalize="characters"></div>
+        ${scanField('ue-sn',u.sn_ue,'Numéro de série complet',i,'N° de série UE')}</div>
 
       <div class="slbl">Fluide frigorigène</div>
       <div class="field"><label>Fluide</label>
@@ -579,14 +765,14 @@ function s2(ch){
         <div class="field"><label>Marque</label>
           ${renderMarqueField(u.marque_id,u.marque_custom,'ui-marque-sel','ui-marque-custom',`data-i="${i}"`)}</div>
         <div class="field"><label>Modèle</label>
-          <input class="ui-modele mono" type="text" value="${esc(u.modele)}" placeholder="Ex : FTXM25R" data-i="${i}"></div>
+          ${scanField('ui-modele',u.modele,'Ex : FTXM25R',i,'Modèle UI')}</div>
       </div>
       <div class="field"><label>N° de série unité intérieure</label>
-        <input class="ui-sn mono" type="text" value="${esc(u.sn_ui)}" placeholder="Numéro de série" data-i="${i}" autocapitalize="characters"></div>
+        ${scanField('ui-sn',u.sn_ui,'Numéro de série',i,'N° de série UI')}</div>
 
       ${u.type==='gainable'?`
       <div class="field"><label>N° de série du caisson gainable</label>
-        <input class="ui-sn-gain mono" type="text" value="${esc(u.sn_gainable)}" placeholder="N° série caisson / boîtier" data-i="${i}" autocapitalize="characters"></div>`:''}
+        ${scanField('ui-sn-gain',u.sn_gainable,'N° série caisson / boîtier',i,'N° de série caisson')}</div>`:''}
 
       <div class="sep"></div>
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -909,6 +1095,7 @@ function bind(){
   on('.pstep','click',e=>{S.step=+e.dataset.step;render();});
 
   // Lightbox photos
+  on('.scan-btn','click',e=>openScanner(e.dataset.scan,+e.dataset.i,e.dataset.lbl));
   on('.ph-img','click',e=>{el('lightbox-img').src=e.src;el('lightbox').classList.add('show');});
 
   if(!ch) return;
@@ -1015,6 +1202,10 @@ let CAN_SHARE_FILES=false;
 try{ CAN_SHARE_FILES=!!(navigator.canShare && navigator.canShare({files:[new File(['x'],'t.pdf',{type:'application/pdf'})]})); }catch(e){}
 
 el('lightbox').addEventListener('click',()=>el('lightbox').classList.remove('show'));
+el('scan-close').addEventListener('click',closeScanner);
+el('scan-ok').addEventListener('click',applyScan);
+el('scan-val').addEventListener('keydown',e=>{if(e.key==='Enter')applyScan();});
+el('scan-again').addEventListener('click',()=>{el('scan-result').hidden=true;el('scan-live').hidden=false;el('scan-msg').textContent='Ouverture de la caméra…';startCam();});
 
 (async()=>{
   load();
