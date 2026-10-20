@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#161b22">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Réception Clim">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Réception Chantier Climatisation</title>
+<!-- Génération PDF directe (sans passer par l'impression) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --bg:#0d1117;--surf:#161b22;--surf2:#21262d;--surf3:#30363d;
+  --bdr:#30363d;--bdr2:#484f58;
+  --tx:#e6edf3;--tx2:#8b949e;--tx3:#484f58;
+  --ac:#2f81f7;--ac-l:rgba(47,129,247,.12);
+  --gr:#3fb950;--gr-l:rgba(63,185,80,.12);
+  --or:#d29922;--or-l:rgba(210,153,34,.12);
+  --rd:#f85149;--rd-l:rgba(248,81,73,.12);
+  --pu:#bc8cff;--pu-l:rgba(188,140,255,.12);
+  --r:8px;--rl:12px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.5;display:flex;flex-direction:column}
+
+#app{flex:1;display:flex;flex-direction:column;overflow:hidden;max-width:480px;width:100%;margin:0 auto}
+
+/* ── Header ── */
+.topbar{background:var(--surf);border-bottom:1px solid var(--bdr);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:8px}
+.topbar-left{display:flex;align-items:center;gap:10px;min-width:0}
+.topbar-left>div:last-child{min-width:0}
+.ttl{font-family:'Syne',sans-serif;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.logo{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;color:var(--ac);background:var(--ac-l);border:1px solid rgba(47,129,247,.3);padding:4px 8px;border-radius:4px;flex-shrink:0}
+.topbar .sub{font-size:11px;color:var(--tx2);font-family:'IBM Plex Mono',monospace;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Progress ── */
+.progbar{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;overflow-x:auto}
+.progbar::-webkit-scrollbar{display:none}
+.pstep{flex:1;min-width:60px;text-align:center;padding:9px 4px 8px;font-size:10px;color:var(--tx3);position:relative;cursor:pointer;white-space:nowrap;font-family:'IBM Plex Mono',monospace}
+.pstep.active{color:var(--ac)}
+.pstep.done{color:var(--gr)}
+.pstep::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:transparent}
+.pstep.active::after{background:var(--ac)}
+.pstep.done::after{background:var(--gr)}
+.pnum{display:block;width:20px;height:20px;border-radius:50%;margin:0 auto 3px;line-height:20px;font-size:10px;font-weight:600;background:var(--surf2);color:var(--tx3);border:1px solid var(--bdr)}
+.pstep.active .pnum{background:var(--ac);color:#fff;border-color:var(--ac)}
+.pstep.done .pnum{background:var(--gr);color:#000;border-color:var(--gr)}
+
+.scroll{flex:1;overflow-y:auto;padding:14px 14px 110px;-webkit-overflow-scrolling:touch}
+
+/* ── Cards ── */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px;margin-bottom:10px}
+.card-highlight{border-color:var(--ac);background:linear-gradient(135deg,var(--surf) 0%,var(--ac-l) 100%)}
+
+/* ── Fields (16px minimum : évite le zoom automatique sur iPhone) ── */
+.field{margin-bottom:11px}.field:last-child{margin-bottom:0}
+label{display:block;font-size:11px;color:var(--tx2);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-family:'IBM Plex Mono',monospace}
+input,select,textarea{width:100%;border:1px solid var(--bdr2);border-radius:var(--r);background:var(--surf2);color:var(--tx);font-family:'IBM Plex Sans',sans-serif;font-size:16px;transition:border-color .15s;-webkit-appearance:none;appearance:none}
+input,select{height:42px;padding:0 11px}
+select{padding-right:30px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238b949e' stroke-width='1.6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+textarea{padding:10px 11px;resize:vertical;min-height:70px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-l)}
+input.mono{font-family:'IBM Plex Mono',monospace;letter-spacing:.3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.total{height:42px;display:flex;align-items:center;padding:0 10px;border-radius:var(--r);background:var(--surf3);color:var(--tx);font-family:'IBM Plex Mono',monospace;font-size:14px;border:1px solid var(--bdr)}
+
+/* ── Buttons ── */
+.btn{display:block;width:100%;height:44px;border-radius:var(--r);font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+.btn-p{background:var(--ac);color:#fff}
+.btn-p:active{opacity:.85;transform:scale(.98)}
+.btn-s{background:var(--surf2);color:var(--tx);border:1px solid var(--bdr2)}
+.btn-s:active{background:var(--surf3)}
+.btn-d{background:var(--rd-l);color:var(--rd);border:1px solid rgba(248,81,73,.3);height:38px;font-size:13px}
+.btn-sm{height:32px;width:auto;padding:0 12px;display:inline-flex;align-items:center;gap:5px;font-size:12px;border-radius:6px}
+.btn-add{width:100%;height:38px;border:1px dashed var(--bdr2);border-radius:var(--r);background:transparent;color:var(--ac);font-family:'IBM Plex Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:6px;transition:all .15s}
+.btn-add:active{background:var(--ac-l);border-color:var(--ac)}
+
+.slbl{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+.slbl::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.sep{height:1px;background:var(--bdr);margin:12px 0}
+
+/* ── Unités intérieures ── */
+.unit-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px;margin-bottom:8px;position:relative}
+.unit-card-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px}
+.unit-nom{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--tx)}
+.unit-type-badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.badge-split{background:var(--ac-l);color:var(--ac);border:1px solid rgba(47,129,247,.3)}
+.badge-gainable{background:var(--pu-l);color:var(--pu);border:1px solid rgba(188,140,255,.3)}
+.badge-cassette{background:var(--or-l);color:var(--or);border:1px solid rgba(210,153,34,.3)}
+.badge-console{background:var(--gr-l);color:var(--gr);border:1px solid rgba(63,185,80,.3)}
+.del-btn{background:var(--rd-l);color:var(--rd);border:1px solid rgba(248,81,73,.3);border-radius:6px;width:30px;height:30px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── Airzone ── */
+.airzone-section{background:var(--or-l);border:1px solid rgba(210,153,34,.3);border-radius:var(--r);padding:10px;margin-top:8px}
+.airzone-title{font-size:11px;font-weight:600;color:var(--or);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-family:'IBM Plex Mono',monospace}
+.az-row{display:grid;grid-template-columns:2fr 1.5fr 30px;gap:6px;align-items:end;margin-bottom:6px}
+.az-row label{font-size:10px}
+.az-row input{height:38px}
+.az-tg{display:flex;border:1px solid var(--bdr2);border-radius:6px;overflow:hidden}
+.az-tg button{height:32px;padding:0 14px;border:none;background:var(--surf2);color:var(--tx2);font-size:12px;font-family:'IBM Plex Sans',sans-serif;cursor:pointer}
+.az-tg button+button{border-left:1px solid var(--bdr2)}
+.az-tg button.on0{background:var(--surf3);color:var(--tx)}
+.az-tg button.on1{background:var(--or);color:#000;font-weight:600}
+
+/* ── UE ── */
+.ue-card{background:linear-gradient(135deg,var(--surf2) 0%,rgba(47,129,247,.08) 100%);border:1px solid var(--ac);border-radius:var(--rl);padding:14px;margin-bottom:10px}
+.ue-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--ac);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+
+.info{background:var(--ac-l);border:1px solid rgba(47,129,247,.3);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--ac);line-height:1.6;margin-top:6px}
+.warn{background:var(--or-l);border:1px solid rgba(210,153,34,.3);border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--or);line-height:1.6}
+.warn ul{margin:4px 0 0 16px}
+
+/* ── Liste ── */
+.pitem{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;transition:border-color .15s}
+.pitem:active{border-color:var(--ac)}
+.pname{font-family:'Syne',sans-serif;font-weight:600;font-size:14px;color:var(--tx)}
+.pmeta{font-size:11px;color:var(--tx2);margin-top:3px;font-family:'IBM Plex Mono',monospace}
+.pstatus{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;border:1px solid;white-space:nowrap}
+.ps-prog{background:var(--or-l);color:var(--or);border-color:rgba(210,153,34,.3)}
+.ps-done{background:var(--gr-l);color:var(--gr);border-color:rgba(63,185,80,.3)}
+.empty{text-align:center;padding:50px 20px}
+.empty .icon{font-size:44px;margin-bottom:14px;filter:grayscale(1);opacity:.5}
+.empty p{font-size:13px;line-height:1.7;color:var(--tx2)}
+
+/* ── Synthèse ── */
+.synth-card{background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px;margin-bottom:8px}
+.synth-hd{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.synth-row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px}
+.synth-row:last-child{border-bottom:none}
+.synth-row .k{color:var(--tx2);font-family:'IBM Plex Mono',monospace;flex-shrink:0}
+.synth-row .v{color:var(--tx);font-weight:500;text-align:right;white-space:pre-wrap;word-break:break-word}
+.sn-chip{background:var(--surf3);border:1px solid var(--bdr2);border-radius:4px;padding:2px 6px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ac);display:inline-block}
+
+/* ── Bas de page ── */
+.botnav{position:fixed;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--bdr);padding:10px 14px max(14px,env(safe-area-inset-bottom));display:flex;gap:8px;max-width:480px;margin:0 auto}
+.botnav .btn{margin:0}
+
+.toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:8px 16px;border-radius:20px;font-size:12px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:999;font-family:'IBM Plex Mono',monospace}
+.toast.show{opacity:1}
+
+/* ── Photos ── */
+.photo-section{margin-top:10px}
+.photo-lbl{font-size:11px;color:var(--tx2);font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-family:'IBM Plex Mono',monospace;margin-bottom:7px;display:block}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.photo-thumb{position:relative;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--surf3);border:1px solid var(--bdr)}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.photo-del{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;background:rgba(248,81,73,.9);color:#fff;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.photo-add-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:42px;border:1px dashed var(--bdr2);border-radius:var(--r);background:transparent;color:var(--ac);font-family:'IBM Plex Sans',sans-serif;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0;margin:0}
+.photo-add-btn:active{background:var(--ac-l)}
+.photo-input{display:none}
+
+/* ── Visionneuse photo ── */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:1000;padding:16px}
+.lightbox.show{display:flex}
+.lightbox img{max-width:100%;max-height:100%;border-radius:6px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<div class="lightbox" id="lightbox"><img id="lightbox-img" alt=""></div>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// RÉCEPTION CHANTIER CLIMATISATION — v2
+// Données texte : localStorage · Photos : IndexedDB · PDF : jsPDF
+// Étapes : Infos client → UE → Unités intérieures → Synthèse + PDF
+// ═══════════════════════════════════════════════════════════════════════
+
+const SKEY = 'clim_reception_v1';
+
+const UI_TYPES = [
+  {id:'split',   lbl:'Split mural',       badge:'badge-split'},
+  {id:'gainable',lbl:'Gainable',          badge:'badge-gainable'},
+  {id:'cassette',lbl:'Cassette',          badge:'badge-cassette'},
+  {id:'console', lbl:'Console / Plancher',badge:'badge-console'},
+  {id:'autre',   lbl:'Autre',             badge:'badge-split'},
+];
+
+const MARQUES = [
+  {id:'',         lbl:'— Choisir —'},
+  {id:'daikin',   lbl:'Daikin'},
+  {id:'mitsubishi',lbl:'Mitsubishi Electric'},
+  {id:'mitsubishi_heavy',lbl:'Mitsubishi Heavy Industries'},
+  {id:'toshiba',  lbl:'Toshiba'},
+  {id:'hitachi',  lbl:'Hitachi'},
+  {id:'panasonic',lbl:'Panasonic'},
+  {id:'lg',       lbl:'LG'},
+  {id:'samsung',  lbl:'Samsung'},
+  {id:'fujitsu',  lbl:'Fujitsu'},
+  {id:'atlantic', lbl:'Atlantic'},
+  {id:'trane',    lbl:'Trane'},
+  {id:'carrier',  lbl:'Carrier'},
+  {id:'lennox',   lbl:'Lennox'},
+  {id:'airwell',  lbl:'Airwell'},
+  {id:'thermor',  lbl:'Thermor'},
+  {id:'olimpia',  lbl:'Olimpia Splendid'},
+  {id:'gree',     lbl:'Gree'},
+  {id:'haier',    lbl:'Haier'},
+  {id:'autre',    lbl:'Autre (saisie libre)'},
+];
+
+const FLUIDES = ['','R32','R410A','R290','R454B','R454C','R134a','R407C','R744 (CO2)','autre'];
+
+function getMarqueLbl(id, custom){
+  if(!id || id==='autre') return custom||'';
+  return MARQUES.find(m=>m.id===id)?.lbl || custom || id;
+}
+function fluideLbl(u){ return u.fluide==='autre' ? (u.fluide_custom||'') : (u.fluide||''); }
+const num = s => { const n=parseFloat(String(s??'').replace(',','.')); return isNaN(n)?null:n; };
+const fmtKg = n => n===null ? '' : n.toLocaleString('fr-FR',{maximumFractionDigits:3})+' kg';
+function chargeTotale(u){
+  const a=num(u.charge_usine), b=num(u.charge_add);
+  if(a===null && b===null) return null;
+  return (a||0)+(b||0);
+}
+
+// ── Stockage photos (IndexedDB) ────────────────────────────────────────
+// Les photos ne vont plus dans localStorage (limité à ~5 Mo) mais dans
+// IndexedDB. Les chantiers ne stockent que l'identifiant de chaque photo.
+const IDB = {
+  db:null,
+  open(){return new Promise((res,rej)=>{
+    if(!window.indexedDB) return rej(new Error('IndexedDB indisponible'));
+    const r=indexedDB.open('clim_photos',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('p');
+    r.onsuccess=()=>{this.db=r.result;res();};
+    r.onerror=()=>rej(r.error);
+  });},
+  tx(mode,fn){return new Promise((res,rej)=>{
+    const t=this.db.transaction('p',mode); const out=fn(t.objectStore('p'));
+    t.oncomplete=()=>res(out?.result); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error);
+  });},
+  put(id,v){return this.tx('readwrite',s=>s.put(v,id));},
+  del(id){return this.tx('readwrite',s=>s.delete(id));},
+  all(){return new Promise((res,rej)=>{
+    const out={}; const rq=this.db.transaction('p').objectStore('p').openCursor();
+    rq.onsuccess=()=>{const c=rq.result; if(c){out[c.key]=c.value;c.continue();} else res(out);};
+    rq.onerror=()=>rej(rq.error);
+  });}
+};
+let PH = {};        // cache mémoire : id → image (dataURL)
+let IDB_OK = false;
+const newPid = () => 'p'+Date.now()+Math.random().toString(36).slice(2,7);
+async function storePhoto(b64){
+  const id=newPid(); PH[id]=b64;
+  if(IDB_OK) await IDB.put(id,b64);
+  return id;
+}
+function dropPhotos(ids){
+  (ids||[]).forEach(id=>{ delete PH[id]; if(IDB_OK) IDB.del(id).catch(()=>{}); });
+}
+
+// ── Données ───────────────────────────────────────────────────────────
+let DB = {chantiers:[], cur:null};
+function load(){try{const r=localStorage.getItem(SKEY);if(r)DB=JSON.parse(r);}catch(e){}}
+function save(){
+  try{localStorage.setItem(SKEY,JSON.stringify(DB));return true;}
+  catch(e){toast('⚠ Erreur de sauvegarde');return false;}
+}
+function cur(){return DB.chantiers.find(c=>c.id===DB.cur);}
+
+function newUE(){
+  return {marque_id:'',marque_custom:'',modele:'',type_ue:'',sn_ue:'',nb_ui:'',
+          fluide:'',fluide_custom:'',charge_usine:'',charge_add:'',notes_ue:'',photos:[]};
+}
+function newChantier(){
+  const id='ch'+Date.now();
+  DB.chantiers.unshift({
+    id, nom:'', adresse:'', client:'', tel:'', technicien:'',
+    date:new Date().toLocaleDateString('fr-FR'),
+    ue:[newUE()], units:[], notes_global:'', statut:'en_cours',
+    created:Date.now(), updated:Date.now()
+  });
+  DB.cur=id; save(); return id;
+}
+function newUnit(){
+  return {
+    id:'u'+Date.now()+Math.random().toString(36).slice(2,5),
+    piece:'', type:'split', ue_idx:0,
+    marque_id:'', marque_custom:'', modele:'', sn_ui:'', photos:[],
+    sn_gainable:'',
+    has_airzone:false, az_registres:[{piece_az:'',num_reg:''}],
+    notes:''
+  };
+}
+function allPhotoIds(ch){
+  return [...ch.ue.flatMap(u=>u.photos||[]), ...ch.units.flatMap(u=>u.photos||[])];
+}
+
+// Mise à niveau des anciennes fiches : nouveaux champs + photos sorties du localStorage
+async function migrate(){
+  let changed=false;
+  for(const ch of DB.chantiers){
+    ch.ue=(ch.ue||[]).map(u=>({...newUE(),...u}));
+    ch.units=(ch.units||[]).map(u=>({...newUnit(),...u,id:u.id||newUnit().id}));
+    for(const holder of [...ch.ue,...ch.units]){
+      holder.photos=holder.photos||[];
+      for(let k=0;k<holder.photos.length;k++){
+        const p=holder.photos[k];
+        if(typeof p==='string' && p.startsWith('data:') && IDB_OK){
+          holder.photos[k]=await storePhoto(p); changed=true;
+        }
+      }
+    }
+  }
+  if(changed) save();
+}
+
+// ── État d'affichage ───────────────────────────────────────────────────
+let S = {screen:'list', step:0};
+const STEPS = ['Infos','UE','Intérieures','Synthèse'];
+
+const el = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+let toastT;
+function toast(msg){const t=el('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200);}
+const photoSrc = p => (typeof p==='string' && p.startsWith('data:')) ? p : PH[p];
+
+// Rendu en conservant la position de défilement sur le même écran
+let lastKey='';
+function render(){
+  const old=document.querySelector('.scroll'); const top=old?old.scrollTop:0;
+  const key=S.screen+':'+S.step+':'+DB.cur;
+  el('app').innerHTML = S.screen==='list' ? renderList() : renderChantier();
+  bind();
+  const sc=document.querySelector('.scroll');
+  if(sc && key===lastKey) sc.scrollTop=top;
+  lastKey=key;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// LISTE DES CHANTIERS
+// ══════════════════════════════════════════════════════════════════════
+function renderList(){
+  const items = DB.chantiers.length===0
+    ? `<div class="empty"><div class="icon">❄️</div><p>Aucun chantier enregistré.<br>Créez votre première fiche de réception.</p></div>`
+    : DB.chantiers.map(c=>{
+        const badge = c.statut==='termine'
+          ? `<span class="pstatus ps-done">✓ Terminé</span>`
+          : `<span class="pstatus ps-prog">En cours</span>`;
+        return `<div class="pitem" data-cid="${c.id}">
+          <div style="min-width:0">
+            <div class="pname">${esc(c.nom||'Chantier sans nom')}</div>
+            <div class="pmeta">${esc(c.client||'Client non renseigné')} · ${esc(c.date)} · ${c.ue.length} UE · ${c.units.length} UI</div>
+          </div>
+          ${badge}
+        </div>`;
+      }).join('');
+
+  return `
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">CLIM</div>
+      <div><div class="ttl">Réception Chantier</div><div class="sub">Climatisation</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--tx2);font-family:'IBM Plex Mono',monospace">${DB.chantiers.length} chantier(s)</div>
+  </div>
+  <div class="scroll">
+    <div class="slbl">Chantiers récents</div>
+    ${items}
+    <button class="btn btn-p" id="btn-new" style="margin-top:10px">+ Nouveau chantier</button>
+    ${!IDB_OK?`<div class="warn" style="margin-top:10px">⚠ Ce navigateur ne permet pas d'enregistrer les photos durablement (navigation privée ?). Générez le PDF avant de fermer la page.</div>`:''}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CHANTIER — STRUCTURE
+// ══════════════════════════════════════════════════════════════════════
+function renderChantier(){
+  const ch=cur(); if(!ch){S.screen='list';return renderList();}
+  const dots=STEPS.map((s,i)=>`
+    <div class="pstep ${i===S.step?'active':i<S.step?'done':''}" data-step="${i}">
+      <span class="pnum">${i<S.step?'✓':i+1}</span>${s}
+    </div>`).join('');
+  let body,nav;
+  if(S.step===0){body=s0(ch);nav=`<button class="btn btn-s" id="btn-list">‹ Liste</button><button class="btn btn-p" id="btn-next">Suivant ›</button>`;}
+  else if(S.step===1){body=s1(ch);nav=`<button class="btn btn-s" id="btn-prev">‹ Retour</button><button class="btn btn-p" id="btn-next">Suivant ›</button>`;}
+  else if(S.step===2){body=s2(ch);nav=`<button class="btn btn-s" id="btn-prev">‹ Retour</button><button class="btn btn-p" id="btn-next">Synthèse ›</button>`;}
+  else{body=s3(ch);nav=`<button class="btn btn-s" id="btn-prev">‹ Modifier</button><button class="btn btn-s" id="btn-list">Liste</button>`;}
+
+  return `
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">CLIM</div>
+      <div><div class="ttl">${esc(ch.nom||'Nouveau chantier')}</div>
+      <div class="sub">${esc(ch.client||'Client non renseigné')}</div></div>
+    </div>
+    <div class="logo" style="font-size:10px;padding:3px 7px">${esc(ch.date)}</div>
+  </div>
+  <div class="progbar">${dots}</div>
+  <div class="scroll">${body}</div>
+  <div class="botnav">${nav}</div>`;
+}
+
+function renderMarqueField(marque_id, marque_custom, cls_sel, cls_custom, data_attr){
+  const opts=MARQUES.map(m=>`<option value="${m.id}" ${marque_id===m.id?'selected':''}>${m.lbl}</option>`).join('');
+  const showCustom=(marque_id==='autre'||(!marque_id&&marque_custom));
+  return `<select class="${cls_sel}" ${data_attr}>${opts}</select>
+    ${showCustom?`<input class="${cls_custom}" type="text" value="${esc(marque_custom)}" placeholder="Nom du fabricant" ${data_attr} style="margin-top:6px">`:''}`;
+}
+
+// Compression image (max 1200 px, JPEG 0,72)
+function compressImage(file, maxW=1200, quality=0.72){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(reader.error);
+    reader.onload=e=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error('Format non lu'));
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        const m=Math.max(w,h); if(m>maxW){w=Math.round(w*maxW/m);h=Math.round(h*maxW/m);}
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg',quality));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// target : 'ue' | 'ui' — idx : index dans ch.ue ou ch.units
+function renderPhotoSection(photos, target, idx){
+  const list=photos||[];
+  const thumbs=list.map((p,pi)=>`
+    <div class="photo-thumb">
+      <img src="${photoSrc(p)||''}" alt="Photo ${pi+1}" class="ph-img">
+      <button class="photo-del" data-pt="${target}" data-pi="${idx}" data-phi="${pi}" aria-label="Supprimer la photo">×</button>
+    </div>`).join('');
+  return `
+  <div class="photo-section">
+    <span class="photo-lbl">📷 Photos (${list.length})</span>
+    ${list.length?`<div class="photo-grid">${thumbs}</div>`:''}
+    <label class="photo-add-btn">
+      📷 Prendre ou choisir des photos
+      <input class="photo-input" type="file" accept="image/*" multiple data-pt="${target}" data-pi="${idx}">
+    </label>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ÉTAPE 0 — INFOS CLIENT / CHANTIER
+// ══════════════════════════════════════════════════════════════════════
+function s0(ch){
+  return `
+  <div class="card card-highlight">
+    <div class="slbl" style="margin-top:0">Identification chantier</div>
+    <div class="field"><label>Réf. chantier / nom dossier</label>
+      <input id="f-nom" type="text" value="${esc(ch.nom)}" placeholder="Ex : DUPONT-2026-001"></div>
+    <div class="field"><label>Date d'intervention</label>
+      <input id="f-date" type="text" inputmode="numeric" value="${esc(ch.date)}" placeholder="JJ/MM/AAAA"></div>
+    <div class="field"><label>Technicien(s)</label>
+      <input id="f-tech" type="text" value="${esc(ch.technicien)}" placeholder="Nom du / des techniciens"></div>
+  </div>
+
+  <div class="card">
+    <div class="slbl" style="margin-top:0">Client</div>
+    <div class="field"><label>Nom du client</label>
+      <input id="f-client" type="text" value="${esc(ch.client)}" placeholder="M. / Mme ..."></div>
+    <div class="field"><label>Adresse du chantier</label>
+      <textarea id="f-adresse" rows="2" placeholder="N°, rue, code postal, ville">${esc(ch.adresse)}</textarea></div>
+    <div class="field"><label>Téléphone</label>
+      <input id="f-tel" type="tel" value="${esc(ch.tel)}" placeholder="06 ..."></div>
+  </div>
+
+  <div class="card">
+    <div class="slbl" style="margin-top:0">Notes globales</div>
+    <textarea id="f-notes-global" rows="3" placeholder="Observations générales, conditions de chantier...">${esc(ch.notes_global)}</textarea>
+  </div>
+  <div class="info">💾 Saisie enregistrée automatiquement sur ce téléphone.</div>
+  <button class="btn btn-d" id="btn-del-ch" style="margin-top:18px">Supprimer ce chantier</button>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ÉTAPE 1 — UNITÉS EXTÉRIEURES
+// ══════════════════════════════════════════════════════════════════════
+function s1(ch){
+  const multi=ch.ue.length>1;
+  const ueHTML=ch.ue.map((u,i)=>{
+    const fOpts=FLUIDES.map(f=>`<option value="${f}" ${u.fluide===f?'selected':''}>${f===''?'— Choisir —':f==='autre'?'Autre':f}</option>`).join('');
+    const tot=chargeTotale(u);
+    return `
+    <div class="ue-card">
+      <div class="ue-title">
+        <span>🏭 Unité extérieure ${multi?`n°${i+1}`:''}</span>
+        ${multi?`<button class="del-btn" data-dei="${i}" aria-label="Supprimer l'UE">×</button>`:''}
+      </div>
+      <div class="row2">
+        <div class="field"><label>Marque</label>
+          ${renderMarqueField(u.marque_id,u.marque_custom,'ue-marque-sel','ue-marque-custom',`data-i="${i}"`)}</div>
+        <div class="field"><label>Modèle</label>
+          <input class="ue-modele mono" type="text" value="${esc(u.modele)}" placeholder="Ex : RXM35R" data-i="${i}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Type / Gamme</label>
+          <input class="ue-type" type="text" value="${esc(u.type_ue)}" placeholder="Multi-split, VRV..." data-i="${i}"></div>
+        <div class="field"><label>Nb d'UI raccordées</label>
+          <input class="ue-nb" type="number" inputmode="numeric" value="${esc(u.nb_ui)}" placeholder="Ex : 3" data-i="${i}" min="1"></div>
+      </div>
+      <div class="field"><label>N° de série UE</label>
+        <input class="ue-sn mono" type="text" value="${esc(u.sn_ue)}" placeholder="Numéro de série complet" data-i="${i}" autocapitalize="characters"></div>
+
+      <div class="slbl">Fluide frigorigène</div>
+      <div class="field"><label>Fluide</label>
+        <select class="ue-fluide" data-i="${i}">${fOpts}</select>
+        ${u.fluide==='autre'?`<input class="ue-fluide-custom" type="text" value="${esc(u.fluide_custom)}" placeholder="Nom du fluide" data-i="${i}" style="margin-top:6px">`:''}
+      </div>
+      <div class="row3">
+        <div class="field"><label>Charge usine</label>
+          <input class="ue-charge-u mono" type="text" inputmode="decimal" value="${esc(u.charge_usine)}" placeholder="kg" data-i="${i}"></div>
+        <div class="field"><label>Complément</label>
+          <input class="ue-charge-a mono" type="text" inputmode="decimal" value="${esc(u.charge_add)}" placeholder="kg" data-i="${i}"></div>
+        <div class="field"><label>Total</label>
+          <div class="total" id="tot-${i}">${tot===null?'—':fmtKg(tot)}</div></div>
+      </div>
+
+      <div class="field" style="margin-top:11px"><label>Notes UE</label>
+        <textarea class="ue-notes" rows="2" placeholder="Emplacement, supports, longueur de liaisons..." data-i="${i}">${esc(u.notes_ue)}</textarea></div>
+      ${renderPhotoSection(u.photos,'ue',i)}
+    </div>`;}).join('');
+
+  return `
+  ${ueHTML}
+  <button class="btn-add" id="btn-add-ue">+ Ajouter une unité extérieure</button>
+  <div class="info" style="margin-top:10px">Les numéros de série et la charge usine figurent sur la plaque signalétique de l'appareil.</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ÉTAPE 2 — UNITÉS INTÉRIEURES
+// ══════════════════════════════════════════════════════════════════════
+function ueShort(ch,i){
+  const u=ch.ue[i]; if(!u) return '—';
+  const d=[getMarqueLbl(u.marque_id,u.marque_custom),u.modele].filter(Boolean).join(' ');
+  return `UE n°${i+1}${d?' — '+d:''}`;
+}
+function s2(ch){
+  const multi=ch.ue.length>1;
+  const unitsHTML=ch.units.map((u,i)=>{
+    const typeInfo=UI_TYPES.find(t=>t.id===u.type)||UI_TYPES[0];
+    const typeOpts=UI_TYPES.map(t=>`<option value="${t.id}" ${u.type===t.id?'selected':''}>${t.lbl}</option>`).join('');
+    const ueOpts=ch.ue.map((_,k)=>`<option value="${k}" ${(u.ue_idx||0)===k?'selected':''}>${esc(ueShort(ch,k))}</option>`).join('');
+    const azRows=(u.az_registres||[]).map((r,ri)=>`
+      <div class="az-row">
+        <div><label>Pièce associée</label><input class="az-piece" type="text" value="${esc(r.piece_az)}" placeholder="Ex : Chambre 1" data-i="${i}" data-ri="${ri}"></div>
+        <div><label>N° registre</label><input class="az-reg mono" type="text" value="${esc(r.num_reg)}" placeholder="R01" data-i="${i}" data-ri="${ri}"></div>
+        <button class="del-btn" style="height:38px" data-del-az="${i}" data-ri="${ri}" aria-label="Supprimer le registre">×</button>
+      </div>`).join('');
+
+    return `
+    <div class="unit-card">
+      <div class="unit-card-hd">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span class="unit-type-badge ${typeInfo.badge}">${typeInfo.lbl}</span>
+          <span class="unit-nom">${esc(u.piece||`UI ${i+1}`)}</span>
+        </div>
+        <button class="del-btn" data-del="${i}" aria-label="Supprimer l'unité">×</button>
+      </div>
+
+      ${multi?`<div class="field"><label>Raccordée à</label><select class="ui-ue" data-i="${i}">${ueOpts}</select></div>`:''}
+      <div class="row2">
+        <div class="field"><label>Pièce / Zone</label>
+          <input class="ui-piece" type="text" value="${esc(u.piece)}" placeholder="Ex : Chambre 1" data-i="${i}"></div>
+        <div class="field"><label>Type d'unité</label>
+          <select class="ui-type" data-i="${i}">${typeOpts}</select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Marque</label>
+          ${renderMarqueField(u.marque_id,u.marque_custom,'ui-marque-sel','ui-marque-custom',`data-i="${i}"`)}</div>
+        <div class="field"><label>Modèle</label>
+          <input class="ui-modele mono" type="text" value="${esc(u.modele)}" placeholder="Ex : FTXM25R" data-i="${i}"></div>
+      </div>
+      <div class="field"><label>N° de série unité intérieure</label>
+        <input class="ui-sn mono" type="text" value="${esc(u.sn_ui)}" placeholder="Numéro de série" data-i="${i}" autocapitalize="characters"></div>
+
+      ${u.type==='gainable'?`
+      <div class="field"><label>N° de série du caisson gainable</label>
+        <input class="ui-sn-gain mono" type="text" value="${esc(u.sn_gainable)}" placeholder="N° série caisson / boîtier" data-i="${i}" autocapitalize="characters"></div>`:''}
+
+      <div class="sep"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:var(--or);font-weight:500">Système Airzone associé ?</span>
+        <div class="az-tg">
+          <button class="az-toggle ${!u.has_airzone?'on0':''}" data-i="${i}" data-az="0">Non</button>
+          <button class="az-toggle ${u.has_airzone?'on1':''}" data-i="${i}" data-az="1">Oui ✦</button>
+        </div>
+      </div>
+      ${u.has_airzone?`
+      <div class="airzone-section">
+        <div class="airzone-title">✦ Airzone — Registres de zones</div>
+        ${azRows}
+        <button class="btn-add az-add-row" data-i="${i}" style="height:34px;font-size:12px;margin-top:4px">+ Ajouter un registre</button>
+      </div>`:''}
+
+      <div class="field" style="margin-top:10px"><label>Notes</label>
+        <textarea class="ui-notes" rows="2" placeholder="Emplacement précis, évacuation condensats, anomalies..." data-i="${i}">${esc(u.notes)}</textarea></div>
+      ${renderPhotoSection(u.photos,'ui',i)}
+    </div>`;
+  }).join('');
+
+  return `
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <span style="font-size:12px;color:var(--tx2)">${ch.units.length} unité(s) intérieure(s)</span>
+  </div>
+  ${ch.units.length===0?`<div class="warn" style="margin-bottom:10px">Aucune unité intérieure pour l'instant.</div>`:''}
+  ${unitsHTML}
+  <button class="btn btn-p" id="btn-add-ui" style="margin-top:6px">+ Ajouter une unité intérieure</button>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CONTRÔLES DE COHÉRENCE
+// ══════════════════════════════════════════════════════════════════════
+function unitsOfUE(ch,i){ return ch.ue.length>1 ? ch.units.filter(u=>(u.ue_idx||0)===i) : ch.units; }
+function checks(ch){
+  const m=[]; const multi=ch.ue.length>1;
+  if(!ch.client) m.push('Nom du client');
+  if(!ch.adresse) m.push('Adresse du chantier');
+  ch.ue.forEach((u,i)=>{
+    const n=multi?` (UE n°${i+1})`:'';
+    if(!u.sn_ue) m.push('N° de série UE'+n);
+    if(!fluideLbl(u)) m.push('Type de fluide'+n);
+    if(chargeTotale(u)===null) m.push('Charge en fluide'+n);
+    const decl=parseInt(u.nb_ui), real=unitsOfUE(ch,i).length;
+    if(decl && decl!==real) m.push(`${decl} UI déclarées${n}, ${real} saisie(s)`);
+  });
+  ch.units.forEach((u,i)=>{
+    const n=u.piece||`UI ${i+1}`;
+    if(!u.sn_ui) m.push(`N° de série UI (${n})`);
+    if(u.type==='gainable' && !u.sn_gainable) m.push(`N° de série caisson (${n})`);
+  });
+  if(!ch.units.length) m.push('Aucune unité intérieure');
+  return m;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ÉTAPE 3 — SYNTHÈSE & PDF
+// ══════════════════════════════════════════════════════════════════════
+const row = (k,v) => `<div class="synth-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+const chip = (v,c) => `<span class="sn-chip"${c?` style="color:${c}"`:''}>${esc(v||'Non renseigné')}</span>`;
+function synthPhotos(list){
+  if(!list||!list.length) return '';
+  return `<div class="photo-section" style="margin-top:8px">
+    <span class="photo-lbl">📷 Photos (${list.length})</span>
+    <div class="photo-grid">${list.map(p=>`<div class="photo-thumb"><img src="${photoSrc(p)||''}" class="ph-img" alt=""></div>`).join('')}</div>
+  </div>`;
+}
+function s3(ch){
+  const multi=ch.ue.length>1;
+  const ueLines=ch.ue.map((u,i)=>{
+    const tot=chargeTotale(u);
+    return `
+    <div class="synth-card">
+      <div class="synth-hd">🏭 Unité extérieure ${multi?`n°${i+1}`:''}</div>
+      ${row('Marque / Modèle',esc([getMarqueLbl(u.marque_id,u.marque_custom),u.modele].filter(Boolean).join(' ')||'—'))}
+      ${row('Type / Gamme',esc(u.type_ue||'—'))}
+      ${row('UI raccordées',`${esc(u.nb_ui||'—')} <span style="color:var(--tx2)">(${unitsOfUE(ch,i).length} saisie(s))</span>`)}
+      ${row('N° de série',chip(u.sn_ue))}
+      ${row('Fluide',esc(fluideLbl(u)||'—'))}
+      ${row('Charge usine',esc(fmtKg(num(u.charge_usine))||'—'))}
+      ${row('Complément',esc(fmtKg(num(u.charge_add))||'—'))}
+      ${row('Charge totale',`<b>${esc(tot===null?'—':fmtKg(tot))}</b>`)}
+      ${u.notes_ue?row('Notes',esc(u.notes_ue)):''}
+      ${synthPhotos(u.photos)}
+    </div>`;}).join('');
+
+  const uiLines=ch.units.map((u,i)=>{
+    const t=UI_TYPES.find(x=>x.id===u.type)||UI_TYPES[0];
+    const az=u.has_airzone&&u.az_registres.length?`
+      <div style="margin-top:6px;padding:8px;background:var(--or-l);border-radius:6px;border:1px solid rgba(210,153,34,.3)">
+        <div style="font-size:10px;font-weight:600;color:var(--or);margin-bottom:5px;font-family:'IBM Plex Mono',monospace">✦ AIRZONE — REGISTRES</div>
+        ${u.az_registres.map(r=>row(esc(r.piece_az||'—'),chip(r.num_reg,'var(--or)'))).join('')}
+      </div>`:'';
+    return `
+    <div class="synth-card">
+      <div class="synth-hd"><span class="unit-type-badge ${t.badge}">${t.lbl}</span> ${esc(u.piece||`UI ${i+1}`)}</div>
+      ${multi?row('Raccordée à',esc(ueShort(ch,u.ue_idx||0))):''}
+      ${row('Marque / Modèle',esc([getMarqueLbl(u.marque_id,u.marque_custom),u.modele].filter(Boolean).join(' ')||'—'))}
+      ${row('N° série UI',chip(u.sn_ui))}
+      ${u.type==='gainable'?row('N° série caisson',chip(u.sn_gainable)):''}
+      ${u.notes?row('Notes',esc(u.notes)):''}
+      ${az}
+      ${synthPhotos(u.photos)}
+    </div>`;
+  }).join('');
+
+  const miss=checks(ch);
+  const canShare=CAN_SHARE_FILES;
+
+  return `
+  <div class="card card-highlight">
+    <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--ac);margin-bottom:12px">📋 Fiche de réception</div>
+    ${row('Réf. chantier',esc(ch.nom||'—'))}
+    ${row('Client',esc(ch.client||'—'))}
+    ${row('Adresse',esc(ch.adresse||'—'))}
+    ${row('Téléphone',esc(ch.tel||'—'))}
+    ${row('Date',esc(ch.date||'—'))}
+    ${row('Technicien(s)',esc(ch.technicien||'—'))}
+    ${row('Équipements',`${ch.ue.length} UE · ${ch.units.length} UI`)}
+    ${ch.notes_global?row('Notes',esc(ch.notes_global)):''}
+  </div>
+
+  ${miss.length?`<div class="warn" style="margin-bottom:10px">⚠ À compléter avant le PDF :<ul>${miss.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:''}
+
+  <div class="slbl">Unité(s) extérieure(s)</div>
+  ${ueLines}
+  <div class="slbl">Unités intérieures (${ch.units.length})</div>
+  ${ch.units.length?uiLines:`<div class="warn">Aucune unité intérieure enregistrée.</div>`}
+
+  <div class="slbl">Fiche PDF</div>
+  ${canShare?`<button class="btn btn-p" id="btn-pdf-share">📤 Envoyer le PDF (mail, Drive...)</button>`:''}
+  <button class="btn ${canShare?'btn-s':'btn-p'}" id="btn-pdf-dl" style="margin-top:8px">⬇️ Télécharger le PDF</button>
+  <button class="btn btn-s" id="btn-termine" style="margin-top:8px;height:38px;font-size:13px;${ch.statut==='termine'?'background:var(--gr-l);color:var(--gr)':'color:var(--tx2)'}">
+    ${ch.statut==='termine'?'✓ Chantier marqué comme terminé':'Marquer le chantier comme terminé'}
+  </button>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// GÉNÉRATION DU PDF (jsPDF)
+// ══════════════════════════════════════════════════════════════════════
+function pdfFileName(ch){
+  const clean=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9-]+/g,'_').replace(/^_+|_+$/g,'');
+  const parts=['Reception',clean(ch.nom),clean(ch.client),clean(ch.date)].filter(Boolean);
+  return parts.join('_')+'.pdf';
+}
+
+function buildPDF(ch){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297,M=14,CW=W-2*M,BOTTOM=H-16;
+  const BLUE=[26,74,138], ORANGE=[176,120,10], GREY=[100,100,100];
+  let y=M;
+  const multi=ch.ue.length>1;
+  // Les polices standard du PDF ne gèrent pas les symboles spéciaux
+  const T=s=>String(s??'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,'...').replace(/[^\x00-\xFF—–€Œœ]/g,'');
+
+  const ensure=h=>{ if(y+h>BOTTOM){ doc.addPage(); y=M; } };
+
+  // En-tête
+  doc.setFillColor(...BLUE); doc.rect(0,0,W,24,'F');
+  doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text('FICHE DE RÉCEPTION CHANTIER',M,11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Installation de climatisation',M,17.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text(T(ch.nom||''),W-M,11,{align:'right'});
+  doc.setFont('helvetica','normal');
+  doc.text(T(ch.date||''),W-M,17.5,{align:'right'});
+  y=32; doc.setTextColor(0);
+
+  const section=t=>{
+    ensure(16); y+=2;
+    doc.setFillColor(...BLUE); doc.rect(M,y,CW,7,'F');
+    doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    doc.text(T(t),M+2.5,y+4.9); y+=9; doc.setTextColor(0);
+  };
+  const sub=(t,color=BLUE)=>{
+    ensure(14); y+=1.5;
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...color);
+    doc.text(T(t),M,y+4); y+=6;
+    doc.setDrawColor(...color); doc.setLineWidth(.4); doc.line(M,y,M+CW,y); y+=1;
+    doc.setTextColor(0);
+  };
+  const row=(k,v,opt={})=>{
+    v=(v===undefined||v===null||v==='')?'—':T(v);
+    const kw=opt.kw||50, ind=opt.ind||0;
+    doc.setFontSize(9.5);
+    const lines=doc.splitTextToSize(v,CW-kw-ind-2);
+    const h=lines.length*4.4+2.4;
+    ensure(h);
+    doc.setFont('helvetica','normal'); doc.setTextColor(...GREY); doc.text(T(k),M+1+ind,y+4.2);
+    doc.setFont(opt.mono?'courier':'helvetica','bold'); doc.setTextColor(0); doc.text(lines,M+kw+ind,y+4.2);
+    y+=h;
+    doc.setDrawColor(225); doc.setLineWidth(.2); doc.line(M+ind,y,M+CW,y);
+  };
+  const photos=(list)=>{
+    const imgs=(list||[]).map(photoSrc).filter(Boolean);
+    if(!imgs.length) return;
+    const gap=3, cols=3, cw=(CW-gap*(cols-1))/cols, ch_=cw*0.8;
+    ensure(6+ch_); y+=2;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+    doc.text(`Photos (${imgs.length})`,M+1,y+3); y+=5; doc.setTextColor(0);
+    imgs.forEach((src,i)=>{
+      const c=i%cols;
+      if(c===0 && i>0) y+=ch_+gap;
+      if(c===0) ensure(ch_+1);
+      const x=M+c*(cw+gap);
+      try{
+        const p=doc.getImageProperties(src);
+        let w=cw,h=cw*p.height/p.width; if(h>ch_){h=ch_;w=h*p.width/p.height;}
+        doc.setFillColor(245,245,245); doc.rect(x,y,cw,ch_,'F');
+        doc.addImage(src,'JPEG',x+(cw-w)/2,y+(ch_-h)/2,w,h,undefined,'FAST');
+      }catch(e){}
+    });
+    y+=ch_+gap;
+  };
+
+  // Chantier
+  section('CHANTIER ET CLIENT');
+  row('Référence chantier',ch.nom);
+  row('Date d\'intervention',ch.date);
+  row('Technicien(s)',ch.technicien);
+  row('Client',ch.client);
+  row('Adresse',ch.adresse);
+  row('Téléphone',ch.tel);
+  row('Équipements',`${ch.ue.length} unité(s) extérieure(s) — ${ch.units.length} unité(s) intérieure(s)`);
+  if(ch.notes_global) row('Observations',ch.notes_global);
+
+  // UE
+  section(multi?'UNITÉS EXTÉRIEURES':'UNITÉ EXTÉRIEURE');
+  ch.ue.forEach((u,i)=>{
+    if(multi) sub(`Unité extérieure n°${i+1}`);
+    const tot=chargeTotale(u);
+    row('Marque',getMarqueLbl(u.marque_id,u.marque_custom));
+    row('Modèle',u.modele,{mono:true});
+    row('Type / Gamme',u.type_ue);
+    row('N° de série',u.sn_ue,{mono:true});
+    row('UI raccordées',u.nb_ui?`${u.nb_ui}`:`${unitsOfUE(ch,i).length}`);
+    row('Fluide frigorigène',fluideLbl(u));
+    row('Charge usine',fmtKg(num(u.charge_usine)));
+    row('Complément de charge',fmtKg(num(u.charge_add)));
+    row('Charge totale',tot===null?'':fmtKg(tot));
+    if(u.notes_ue) row('Notes',u.notes_ue);
+    photos(u.photos);
+  });
+
+  // UI
+  section(`UNITÉS INTÉRIEURES (${ch.units.length})`);
+  if(!ch.units.length) row('—','Aucune unité intérieure enregistrée');
+  ch.units.forEach((u,i)=>{
+    const t=UI_TYPES.find(x=>x.id===u.type)||UI_TYPES[0];
+    sub(`${i+1}. ${u.piece||'UI '+(i+1)} — ${t.lbl}`);
+    if(multi) row('Raccordée à',ueShort(ch,u.ue_idx||0));
+    row('Marque',getMarqueLbl(u.marque_id,u.marque_custom));
+    row('Modèle',u.modele,{mono:true});
+    row('N° de série UI',u.sn_ui,{mono:true});
+    if(u.type==='gainable') row('N° série caisson',u.sn_gainable,{mono:true});
+    if(u.has_airzone){
+      row('Airzone','Oui — '+u.az_registres.length+' registre(s)');
+      u.az_registres.forEach(r=>row(r.piece_az||'—','Registre '+(r.num_reg||'—'),{ind:6,kw:44}));
+    }
+    if(u.notes) row('Notes',u.notes);
+    photos(u.photos);
+  });
+
+  // Pied de page sur chaque page
+  const n=doc.getNumberOfPages();
+  const foot=T([ch.nom,ch.client].filter(Boolean).join(' · '));
+  const gen='Généré le '+new Date().toLocaleDateString('fr-FR');
+  for(let p=1;p<=n;p++){
+    doc.setPage(p);
+    doc.setDrawColor(200); doc.setLineWidth(.2); doc.line(M,H-11,W-M,H-11);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GREY);
+    doc.text(foot,M,H-7);
+    doc.text(`${gen} — Page ${p}/${n}`,W-M,H-7,{align:'right'});
+  }
+  return doc;
+}
+
+function makePdfFile(ch){
+  if(!window.jspdf){ toast('⚠ Module PDF non chargé — connexion requise'); return null; }
+  const doc=buildPDF(ch);
+  const name=pdfFileName(ch);
+  return {name, blob:doc.output('blob')};
+}
+async function sharePDF(ch){
+  const f=makePdfFile(ch); if(!f) return;
+  const file=new File([f.blob],f.name,{type:'application/pdf'});
+  try{
+    await navigator.share({files:[file],title:f.name.replace('.pdf','')});
+  }catch(e){
+    if(e.name!=='AbortError'){ toast('Partage impossible — téléchargement'); downloadBlob(f); }
+  }
+}
+function downloadBlob(f){
+  const url=URL.createObjectURL(f.blob);
+  const a=document.createElement('a'); a.href=url; a.download=f.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+  toast('✓ PDF généré');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ÉVÉNEMENTS
+// ══════════════════════════════════════════════════════════════════════
+function bind(){
+  const ch=cur();
+  const touch=()=>{ if(ch){ch.updated=Date.now();} save(); };
+  const on=(sel,ev,fn)=>document.querySelectorAll(sel).forEach(e=>e.addEventListener(ev,()=>fn(e)));
+
+  // Liste
+  el('btn-new')?.addEventListener('click',()=>{newChantier();S.screen='project';S.step=0;render();});
+  on('.pitem','click',e=>{DB.cur=e.dataset.cid;S.screen='project';S.step=0;save();render();});
+
+  // Navigation
+  el('btn-list')?.addEventListener('click',()=>{S.screen='list';render();});
+  el('btn-next')?.addEventListener('click',()=>{touch();S.step++;render();});
+  el('btn-prev')?.addEventListener('click',()=>{S.step--;render();});
+  on('.pstep','click',e=>{S.step=+e.dataset.step;render();});
+
+  // Lightbox photos
+  on('.ph-img','click',e=>{el('lightbox-img').src=e.src;el('lightbox').classList.add('show');});
+
+  if(!ch) return;
+
+  // Étape 0
+  const b0=(id,k)=>el(id)?.addEventListener('input',ev=>{ch[k]=ev.target.value;touch();});
+  b0('f-nom','nom');b0('f-date','date');b0('f-tech','technicien');
+  b0('f-client','client');b0('f-adresse','adresse');b0('f-tel','tel');b0('f-notes-global','notes_global');
+  el('btn-del-ch')?.addEventListener('click',()=>{
+    if(!confirm(`Supprimer définitivement le chantier « ${ch.nom||'sans nom'} » et ses photos ?`)) return;
+    dropPhotos(allPhotoIds(ch));
+    DB.chantiers=DB.chantiers.filter(c=>c.id!==ch.id); DB.cur=null; save();
+    S.screen='list'; render(); toast('Chantier supprimé');
+  });
+
+  // Étape 1 — UE
+  el('btn-add-ue')?.addEventListener('click',()=>{ch.ue.push(newUE());touch();render();});
+  on('[data-dei]','click',e=>{
+    const i=+e.dataset.dei; if(ch.ue.length<=1) return;
+    if(!confirm(`Supprimer l'unité extérieure n°${i+1} et ses photos ?`)) return;
+    dropPhotos(ch.ue[i].photos); ch.ue.splice(i,1);
+    ch.units.forEach(u=>{ if((u.ue_idx||0)===i) u.ue_idx=0; else if(u.ue_idx>i) u.ue_idx--; });
+    touch(); render();
+  });
+  const ueIn=(sel,k,up)=>on(sel,'input',e=>{const v=up?e.value.toUpperCase():e.value; if(up)e.value=v; ch.ue[+e.dataset.i][k]=v; touch();});
+  on('.ue-marque-sel','change',e=>{ch.ue[+e.dataset.i].marque_id=e.value;touch();render();});
+  ueIn('.ue-marque-custom','marque_custom');
+  ueIn('.ue-modele','modele',true);
+  ueIn('.ue-type','type_ue');
+  ueIn('.ue-nb','nb_ui');
+  ueIn('.ue-sn','sn_ue',true);
+  ueIn('.ue-notes','notes_ue');
+  on('.ue-fluide','change',e=>{ch.ue[+e.dataset.i].fluide=e.value;touch();render();});
+  ueIn('.ue-fluide-custom','fluide_custom',true);
+  const updTot=e=>{const i=+e.dataset.i;const t=chargeTotale(ch.ue[i]);const d=el('tot-'+i);if(d)d.textContent=t===null?'—':fmtKg(t);};
+  on('.ue-charge-u','input',e=>{ch.ue[+e.dataset.i].charge_usine=e.value;touch();updTot(e);});
+  on('.ue-charge-a','input',e=>{ch.ue[+e.dataset.i].charge_add=e.value;touch();updTot(e);});
+
+  // Étape 2 — UI
+  el('btn-add-ui')?.addEventListener('click',()=>{
+    const u=newUnit();
+    const prev=ch.units[ch.units.length-1];
+    if(prev){u.marque_id=prev.marque_id;u.marque_custom=prev.marque_custom;u.ue_idx=prev.ue_idx||0;} // reprend la marque précédente
+    else if(ch.ue[0]){u.marque_id=ch.ue[0].marque_id;u.marque_custom=ch.ue[0].marque_custom;}
+    ch.units.push(u);touch();render();
+    const cards=document.querySelectorAll('.unit-card'); cards[cards.length-1]?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  on('[data-del]','click',e=>{
+    const i=+e.dataset.del, u=ch.units[i];
+    if(!confirm(`Supprimer l'unité « ${u.piece||'UI '+(i+1)} » et ses photos ?`)) return;
+    dropPhotos(u.photos); ch.units.splice(i,1); touch(); render();
+  });
+  const uiIn=(sel,k,up)=>on(sel,'input',e=>{const v=up?e.value.toUpperCase():e.value; if(up)e.value=v; ch.units[+e.dataset.i][k]=v; touch();});
+  uiIn('.ui-piece','piece');
+  uiIn('.ui-marque-custom','marque_custom');
+  uiIn('.ui-modele','modele',true);
+  uiIn('.ui-sn','sn_ui',true);
+  uiIn('.ui-sn-gain','sn_gainable',true);
+  uiIn('.ui-notes','notes');
+  on('.ui-type','change',e=>{ch.units[+e.dataset.i].type=e.value;touch();render();});
+  on('.ui-ue','change',e=>{ch.units[+e.dataset.i].ue_idx=+e.value;touch();});
+  on('.ui-marque-sel','change',e=>{ch.units[+e.dataset.i].marque_id=e.value;touch();render();});
+
+  // Airzone
+  on('.az-toggle','click',e=>{ch.units[+e.dataset.i].has_airzone=e.dataset.az==='1';touch();render();});
+  on('.az-piece','input',e=>{ch.units[+e.dataset.i].az_registres[+e.dataset.ri].piece_az=e.value;touch();});
+  on('.az-reg','input',e=>{e.value=e.value.toUpperCase();ch.units[+e.dataset.i].az_registres[+e.dataset.ri].num_reg=e.value;touch();});
+  on('.az-add-row','click',e=>{ch.units[+e.dataset.i].az_registres.push({piece_az:'',num_reg:''});touch();render();});
+  on('[data-del-az]','click',e=>{ch.units[+e.dataset.delAz].az_registres.splice(+e.dataset.ri,1);touch();render();});
+
+  // Photos — ajout (plusieurs à la fois, compression, IndexedDB)
+  on('.photo-input','change',async inp=>{
+    const files=[...inp.files]; if(!files.length) return;
+    const holder=inp.dataset.pt==='ue'?ch.ue[+inp.dataset.pi]:ch.units[+inp.dataset.pi];
+    holder.photos=holder.photos||[];
+    toast(`Traitement de ${files.length} photo(s)…`);
+    let ok=0;
+    for(const f of files){
+      try{ holder.photos.push(await storePhoto(await compressImage(f))); ok++; }
+      catch(err){ toast('⚠ Une photo n\'a pas pu être lue'); }
+    }
+    touch(); render();
+    if(ok) toast(`✓ ${ok} photo(s) ajoutée(s)`);
+  });
+  // Photos — suppression
+  on('.photo-del','click',btn=>{
+    if(!confirm('Supprimer cette photo ?')) return;
+    const holder=btn.dataset.pt==='ue'?ch.ue[+btn.dataset.pi]:ch.units[+btn.dataset.pi];
+    const [id]=holder.photos.splice(+btn.dataset.phi,1); dropPhotos([id]);
+    touch(); render();
+  });
+
+  // Étape 3 — PDF et statut
+  el('btn-pdf-share')?.addEventListener('click',()=>sharePDF(ch));
+  el('btn-pdf-dl')?.addEventListener('click',()=>{const f=makePdfFile(ch); if(f) downloadBlob(f);});
+  el('btn-termine')?.addEventListener('click',()=>{
+    ch.statut=ch.statut==='termine'?'en_cours':'termine'; touch(); render();
+    toast(ch.statut==='termine'?'✓ Chantier marqué terminé':'Chantier remis en cours');
+  });
+}
+
+// ── Démarrage ──────────────────────────────────────────────────────────
+let CAN_SHARE_FILES=false;
+try{ CAN_SHARE_FILES=!!(navigator.canShare && navigator.canShare({files:[new File(['x'],'t.pdf',{type:'application/pdf'})]})); }catch(e){}
+
+el('lightbox').addEventListener('click',()=>el('lightbox').classList.remove('show'));
+
+(async()=>{
+  load();
+  try{ await IDB.open(); PH=await IDB.all(); IDB_OK=true; }catch(e){ IDB_OK=false; }
+  try{ await migrate(); }catch(e){}
+  render();
+  try{ navigator.storage?.persist?.(); }catch(e){}   // demande au navigateur de ne pas effacer les données
+  if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
